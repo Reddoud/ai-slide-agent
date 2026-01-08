@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  passwordHash   String?
+  role           UserRole @default(EDITOR)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  decks          Deck[]
+  comments       Comment[]
+
+  @@index([organizationId])
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  decks     Deck[]
+  themes    Theme[]
+}
+
+model Deck {
+  id             String     @id @default(cuid())
+  title          String
+  status         DeckStatus @default(DRAFT)
+  audience       String
+  goal           String
+  targetSlides   Int        @default(10)
+  themeId        String?
+  theme          Theme?     @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdBy      User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  version        Int        @default(1)
+  planData       Json?
+  metadata       Json?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  slides         Slide[]
+  jobs           Job[]
+  versions       DeckVersion[]
+  comments       Comment[]
+  assets         Asset[]
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([status])
+}
+
+enum DeckStatus {
+  DRAFT
+  PLANNING
+  LAYOUT
+  REVIEW
+  COMPLETED
+  FAILED
+}
+
+model Slide {
+  id          String   @id @default(cuid())
+  deckId      String
+  deck        Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  type        String
+  order       Int
+  title       String
+  subtitle    String?
+  notes       String?
+  layoutData  Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  elements    Element[]
+  comments    Comment[]
+
+  @@unique([deckId, order])
+  @@index([deckId])
+}
+
+model Element {
+  id        String   @id @default(cuid())
+  slideId   String
+  slide     Slide    @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  type      String
+  position  Json
+  content   Json
+  style     Json?
+  locked    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slideId])
+}
+
+model Theme {
+  id             String   @id @default(cuid())
+  name           String
+  colors         Json
+  typography     Json
+  spacing        Json
+  logoUrl        String?
+  backgroundImage String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isPublic       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  decks          Deck[]
+
+  @@index([organizationId])
+  @@index([isPublic])
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  type        String
+  status      JobStatus @default(PENDING)
+  deckId      String
+  deck        Deck      @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  data        Json
+  result      Json?
+  error       String?
+  progress    Int       @default(0)
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@index([deckId])
+  @@index([status])
+  @@index([type])
+}
+
+enum JobStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  FAILED
+  DELAYED
+}
+
+model DeckVersion {
+  id        String   @id @default(cuid())
+  deckId    String
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  version   Int
+  snapshot  Json
+  changes   String?
+  createdAt DateTime @default(now())
+
+  @@unique([deckId, version])
+  @@index([deckId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  deckId    String
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  slideId   String?
+  slide     Slide?   @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  elementId String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([deckId])
+  @@index([slideId])
+}
+
+model Asset {
+  id          String   @id @default(cuid())
+  deckId      String?
+  deck        Deck?    @relation(fields: [deckId], references: [id], onDelete: SetNull)
+  filename    String
+  mimeType    String
+  size        Int
+  storageKey  String   @unique
+  url         String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([deckId])
+}

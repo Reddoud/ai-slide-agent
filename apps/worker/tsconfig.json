@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "module": "ESNext",
+    "moduleResolution": "node"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/layout-engine" },
+    { "path": "../../packages/quality-gates" },
+    { "path": "../../packages/pptx-renderer" }
+  ]
+}
