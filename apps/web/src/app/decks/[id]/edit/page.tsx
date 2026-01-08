@@ -64,27 +64,25 @@ export default function EditDeckPage() {
       if (slideCount > 0) {
         // Slides exist - generation complete
         setGenerationState('completed');
-        stopPolling();
       } else if (status === 'FAILED' || status === 'ERROR') {
         // Generation failed
         setGenerationState('error');
         setError('Deck generation failed. Please try creating a new deck.');
-        stopPolling();
       } else if (status === 'PLANNING' || status === 'LAYOUT' || status === 'CONTENT') {
         // Still generating
         const elapsed = Date.now() - startTimeRef.current;
         if (elapsed > maxPollingTime) {
+          // Timeout - stop polling
           setGenerationState('timeout');
           setError('Generation is taking longer than expected. Please refresh or contact support.');
-          stopPolling();
         } else {
+          // Keep generating
           setGenerationState('generating');
           setPollingAttempts(prev => prev + 1);
         }
       } else {
         // Unknown state
         setGenerationState('completed');
-        stopPolling();
       }
 
       return true;
@@ -92,10 +90,15 @@ export default function EditDeckPage() {
       console.error('Failed to fetch deck:', err);
       setError(err instanceof Error ? err.message : 'Failed to load deck');
       setGenerationState('error');
-      stopPolling();
       return false;
     }
   }, [deckId]);
+
+  // Store fetchDeck in ref so interval always calls latest version
+  const fetchDeckRef = useRef(fetchDeck);
+  useEffect(() => {
+    fetchDeckRef.current = fetchDeck;
+  }, [fetchDeck]);
 
   // Stop polling
   const stopPolling = useCallback(() => {
@@ -107,31 +110,31 @@ export default function EditDeckPage() {
 
   // Start polling
   const startPolling = useCallback(() => {
-    stopPolling(); // Clear any existing interval
+    stopPolling(); // Clear any existing
     pollingIntervalRef.current = setInterval(() => {
-      fetchDeck();
+      fetchDeckRef.current(); // Use ref to get latest fetchDeck
     }, pollingInterval);
-  }, [fetchDeck, stopPolling]);
+  }, [stopPolling]);
 
   // Initial load
   useEffect(() => {
     if (!deckId) return;
 
     startTimeRef.current = Date.now();
-    fetchDeck().then((success) => {
-      if (success && generationState === 'generating') {
-        startPolling();
-      }
-    });
+    fetchDeck();
 
     return () => stopPolling();
-  }, [deckId]); // Only run on mount
+  }, [deckId, fetchDeck, stopPolling]);
 
   // Start/stop polling based on generation state
   useEffect(() => {
-    if (generationState === 'generating' && !pollingIntervalRef.current) {
-      startPolling();
-    } else if (generationState !== 'generating') {
+    if (generationState === 'generating') {
+      // Only start if not already polling
+      if (!pollingIntervalRef.current) {
+        startPolling();
+      }
+    } else {
+      // Stop for any other state
       stopPolling();
     }
 
